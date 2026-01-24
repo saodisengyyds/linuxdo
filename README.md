@@ -1,5 +1,10 @@
 # LinuxDo 每日签到（每日打卡）
 
+## linuxdo_upgrade.py为升级版增加了自动回复点赞功能快速升级
+
+
+
+
 ## 项目描述
 
 这个项目用于自动登录 [LinuxDo](https://linux.do/) 网站并随机读取几个帖子。它使用 Python 和 Playwright
