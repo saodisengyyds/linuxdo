@@ -14,6 +14,7 @@ from DrissionPage import ChromiumOptions, Chromium
 from tabulate import tabulate
 from curl_cffi import requests
 from bs4 import BeautifulSoup
+import json
 
 
 # ================== 升级配置 ==================
@@ -25,10 +26,10 @@ UPGRADE_CONFIG = {
 
 # 回复内容池
 REPLY_TEMPLATES = [
-    "感谢分享！",
+    "感谢分享！很努力",
     "学习了，很有帮助",
-    "支持一下",
-    "不错的内容",
+    "支持一下，3Q",
+    "不错的内容哈哈",
     "mark一下",
     "收藏了",
     "有用的信息",
@@ -72,11 +73,15 @@ GOTIFY_TOKEN = os.environ.get("GOTIFY_TOKEN")
 SC3_PUSH_KEY = os.environ.get("SC3_PUSH_KEY")
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")  # Telegram Bot Token
 TG_CHAT_ID = os.environ.get("TG_CHAT_ID")  # Telegram Chat ID
+WECHAT_API_URL = os.environ.get("WECHAT_API_URL")   # 自定义微信 API 地址
+WECHAT_AUTH_TOKEN = os.environ.get("WECHAT_AUTH_TOKEN") # 自定义微信 Token
+LINUXDO_PROXY = os.environ.get("LINUXDO_PROXY")  # 代理设置
 
 HOME_URL = "https://linux.do/"
 LOGIN_URL = "https://linux.do/login"
 SESSION_URL = "https://linux.do/session"
 CSRF_URL = "https://linux.do/session/csrf"
+COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "linuxdo_cookies.json")
 
 
 class LinuxDoUpgrade:
@@ -95,13 +100,24 @@ class LinuxDoUpgrade:
             .headless(True)
             .incognito(True)
             .set_argument("--no-sandbox")
+            .set_argument("--disable-gpu")
+            .set_argument("--disable-dev-shm-usage")
+            .set_argument("--disable-extensions")
+            .set_argument("--window-size=1920,1080")
         )
+        if LINUXDO_PROXY:
+            co.set_proxy(LINUXDO_PROXY)
         co.set_user_agent(
             f"Mozilla/5.0 ({platformIdentifier}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
         )
         self.browser = Chromium(co)
         self.page = self.browser.new_tab()
+        # 使用 eager 模式，DOM 加载完即可，不用等待所有资源 loaded
+        self.page.set.load_mode.eager()
         self.session = requests.Session()
+        if LINUXDO_PROXY:
+            self.session.proxies = {"http": LINUXDO_PROXY, "https": LINUXDO_PROXY}
+            logger.info(f"已启用代理: {LINUXDO_PROXY}")
         self.session.headers.update(
             {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",
@@ -118,87 +134,156 @@ class LinuxDoUpgrade:
             'replies_posted': 0,
         }
 
+    def load_cookies(self):
+        """加载本地 Cookie"""
+        if not os.path.exists(COOKIE_FILE):
+             return False
+        
+        try:
+            with open(COOKIE_FILE, 'r', encoding='utf-8') as f:
+                cookies = json.load(f)
+            
+            # 注入到 Session
+            for cookie in cookies:
+                # 简单处理：将 dict 转换为 cookie jar 所需格式，或者直接 set
+                # 这里假设 cookie 是 list of dict
+                self.session.cookies.set(cookie['name'], cookie['value'], domain=cookie.get('domain', '.linux.do'))
+            
+            # 注入到 Browser
+            self.page.set.cookies(cookies)
+            logger.info(f"已加载本地 Cookie ({len(cookies)} 个)")
+            return True
+        except Exception as e:
+            logger.warning(f"加载 Cookie 失败: {e}")
+            return False
+
+    def save_cookies(self):
+        """保存 Cookie 到本地"""
+        try:
+            # 优先保存浏览器中的 Cookie，因为可能包含更多动态生成的
+            cookies = self.page.cookies.as_list()
+            # 过滤只保存 linux.do 相关
+            filtered_cookies = [c for c in cookies if 'linux.do' in c.get('domain', '')]
+            
+            if filtered_cookies:
+                with open(COOKIE_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(filtered_cookies, f, indent=2, ensure_ascii=False)
+                logger.success("Cookie 已保存到本地")
+        except Exception as e:
+            logger.warning(f"保存 Cookie 失败: {e}")
+
     @retry_decorator(retries=2, delay=2)
     def login(self):
-        """登录 Linux.Do"""
-        logger.info("开始登录")
+        """登录 Linux.Do (DrissionPage 浏览器模拟)"""
+        logger.info("开始登录流程...")
         
-        # Step 1: Get CSRF Token
-        logger.info("获取 CSRF token...")
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": LOGIN_URL,
-        }
-        resp_csrf = self.session.get(CSRF_URL, headers=headers, impersonate="chrome136")
-        csrf_data = resp_csrf.json()
-        csrf_token = csrf_data.get("csrf")
-        logger.info(f"CSRF Token obtained: {csrf_token[:10]}...")
-
-        # Step 2: Login
-        logger.info("正在登录...")
-        headers.update(
-            {
-                "X-CSRF-Token": csrf_token,
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "Origin": "https://linux.do",
-            }
-        )
-
-        data = {
-            "login": USERNAME,
-            "password": PASSWORD,
-            "second_factor_method": "1",
-            "timezone": "Asia/Shanghai",
-        }
-
-        resp_login = self.session.post(
-            SESSION_URL, data=data, impersonate="chrome136", headers=headers
-        )
-
-        if resp_login.status_code == 200:
-            response_json = resp_login.json()
-            if response_json.get("error"):
-                logger.error(f"登录失败: {response_json.get('error')}")
+        # 尝试 Cookie 登录
+        if self.load_cookies():
+            logger.info("尝试使用 Cookie 验证登录...")
+            try:
+                self.page.get(HOME_URL)
+                time.sleep(5)
+                if self.check_login_status():
+                    logger.success("Cookie 登录验证成功！")
+                    return True
+                else:
+                    logger.warning("Cookie 失效，转为密码登录")
+            except Exception as e:
+                logger.warning(f"Cookie 登录尝试异常: {e}")
+        
+        # 密码登录流程
+        logger.info("执行账号密码登录 (浏览器模式)...")
+        try:
+            self.page.get(LOGIN_URL)
+            time.sleep(3)
+            
+            # 检测 Cloudflare
+            if "Just a moment" in self.page.title:
+                logger.warning("检测到 Cloudflare 验证页面，等待自动跳过...")
+                time.sleep(10)
+            
+            # 等待登录框出现
+            logger.info("寻找登录输入框...")
+            
+            # 输入用户名
+            user_input = self.page.ele("#login-account-name", timeout=10)
+            if not user_input:
+                # 尝试点击登录按钮唤起弹窗 (如果直接访问 login url 没有显示输入框)
+                login_btn_top = self.page.ele(".login-button")
+                if login_btn_top:
+                    login_btn_top.click()
+                    time.sleep(2)
+                    user_input = self.page.ele("#login-account-name", timeout=10)
+            
+            if not user_input:
+                logger.error("未找到用户名输入框")
                 return False
-            logger.success("登录成功!")
-        else:
-            logger.error(f"登录失败，状态码: {resp_login.status_code}")
+                
+            user_input.clear()
+            user_input.input(USERNAME)
+            time.sleep(0.5)
+            
+            # 输入密码
+            pwd_input = self.page.ele("#login-account-password")
+            if not pwd_input:
+                logger.error("未找到密码输入框")
+                return False
+                
+            pwd_input.clear()
+            pwd_input.input(PASSWORD)
+            time.sleep(0.5)
+            
+            # 点击登录
+            login_btn = self.page.ele("#login-button")
+            if not login_btn:
+                logger.error("未找到登录提交按钮")
+                return False
+                
+            login_btn.click()
+            logger.info("已点击登录按钮，等待跳转...")
+            
+            # 等待登录成功
+            for i in range(20):
+                time.sleep(1)
+                if self.check_login_status():
+                    logger.success("登录成功!")
+                    
+                    # 登录成功后同步 Cookie 到 session (用于通知等)
+                    self.sync_cookies_to_session()
+                    # 保存 Cookie 到本地
+                    self.save_cookies()
+                    return True
+            
+            logger.error("登录超时，未检测到登录成功状态")
             return False
 
-        self.print_connect_info()
+        except Exception as e:
+            logger.error(f"登录过程发生异常: {e}")
+            return False
 
-        # Step 3: Sync cookies to DrissionPage
-        logger.info("同步 Cookie 到 DrissionPage...")
-        cookies_dict = self.session.cookies.get_dict()
-        dp_cookies = []
-        for name, value in cookies_dict.items():
-            dp_cookies.append(
-                {
-                    "name": name,
-                    "value": value,
-                    "domain": ".linux.do",
-                    "path": "/",
-                }
-            )
-
-        self.page.set.cookies(dp_cookies)
-        logger.info("Cookie 设置完成，导航至 linux.do...")
-        self.page.get(HOME_URL)
-        time.sleep(5)
-        
-        user_ele = self.page.ele("@id=current-user")
-        if not user_ele:
-            if "avatar" in self.page.html:
-                logger.success("登录验证成功 (通过 avatar)")
+    def sync_cookies_to_session(self):
+        """同步浏览器 Cookie 到 requests session"""
+        try:
+            cookies = self.page.cookies.as_dict()
+            self.session.cookies.update(cookies)
+            logger.info(f"已同步 {len(cookies)} 个 Cookie 到 Session")
+        except Exception as e:
+            logger.warning(f"同步 Cookie 失败: {e}")
+            
+    def check_login_status(self):
+        """检查页面是否已登录"""
+        try:
+            user_ele = self.page.ele("@id=current-user")
+            if user_ele:
                 return True
-            logger.error("登录验证失败")
+                
+            if "avatar" in self.page.html:
+                # 再次确认不是默认头像或登录按钮
+                return True
+                
             return False
-        else:
-            logger.success("登录验证成功")
-            return True
+        except:
+            return False
     
     def wait_for_page_load(self, timeout: int = 10):
         """等待页面加载完成"""
@@ -225,11 +310,19 @@ class LinuxDoUpgrade:
         # 导航到最新话题页面
         try:
             logger.info("导航到最新话题页面...")
-            self.page.get(f"{HOME_URL}latest")
-            time.sleep(5)  # 等待页面加载
+            # 设置超时和重试
+            self.page.get(f"{HOME_URL}latest", timeout=20, retry=2)
+            time.sleep(5)  # 等待动态内容渲染
         except Exception as e:
             logger.error(f"导航失败: {e}")
-            return False
+            # 尝试刷新一次
+            try:
+                logger.info("尝试刷新页面...")
+                self.page.refresh()
+                time.sleep(5)
+            except Exception as e2:
+                logger.error(f"刷新失败: {e2}")
+                return False
         
         # 查找主题列表
         try:
@@ -250,6 +343,9 @@ class LinuxDoUpgrade:
                 return False
         if not topic_list:
             logger.error("未找到主题帖")
+            # 调试：打印页面标题和少量 HTML
+            logger.debug(f"当前页面标题: {self.page.title}")
+            logger.debug(f"页面源码前 500 字符: {self.page.html[:500]}")
             return False
         
         logger.info(f"发现 {len(topic_list)} 个主题帖，随机选择 {UPGRADE_CONFIG['topics_to_browse']} 个")
@@ -360,19 +456,36 @@ class LinuxDoUpgrade:
         liked_count = 0
         try:
             # 等待页面稳定
-            time.sleep(3)
+            time.sleep(2)
             
-            # 使用 JavaScript 直接点赞（避免元素失效）
+            # 使用 JavaScript 直接点赞（扩大选择器范围）
             for attempt in range(max_likes):
                 try:
                     result = page.run_js("""
-                        var buttons = document.querySelectorAll('.discourse-reactions-reaction-button');
-                        for (var i = 0; i < buttons.length; i++) {
-                            var btn = buttons[i];
-                            if (!btn.classList.contains('has-reaction') && !btn.classList.contains('reacted')) {
-                                btn.scrollIntoView({block: 'center'});
-                                btn.click();
-                                return true;
+                        // 多种可能的点赞按钮选择器
+                        const selectors = [
+                            '.discourse-reactions-reaction-button', 
+                            '.btn-toggle-reaction-like', 
+                            'button[title="点赞"]',
+                            '.widget-button.btn-flat.like',
+                            '.actions .like'
+                        ];
+                        
+                        // 寻找所有可见的按钮
+                        for (let sel of selectors) {
+                            let buttons = document.querySelectorAll(sel);
+                            for (let i = 0; i < buttons.length; i++) {
+                                let btn = buttons[i];
+                                // 检查是否已点赞
+                                if (!btn.classList.contains('has-reaction') && 
+                                    !btn.classList.contains('reacted') && 
+                                    !btn.title.includes('取消') &&
+                                    btn.offsetParent !== null) { // 确保可见
+                                    
+                                    btn.scrollIntoView({block: 'center'});
+                                    btn.click();
+                                    return true;
+                                }
                             }
                         }
                         return false;
@@ -387,7 +500,7 @@ class LinuxDoUpgrade:
                         if self.stats['likes_given'] >= UPGRADE_CONFIG['likes_to_give']:
                             break
                     else:
-                        logger.debug("未找到可点赞的按钮")
+                        logger.debug("未找到未点赞的按钮")
                         break
                         
                 except Exception as e:
@@ -413,31 +526,23 @@ class LinuxDoUpgrade:
                 selectors = [
                     "button.reply.create",
                     "button.reply",
-                    ".topic-footer-main-buttons button.reply"
+                    ".topic-footer-main-buttons button.reply",
+                    ".topic-footer-main-buttons .btn.create",
+                    "#topic-footer-buttons .reply"
                 ]
                 
-                clicked = False
-                for selector in selectors:
-                    try:
-                        result = page.run_js(f"""
-                            var btn = document.querySelector('{selector}');
-                            if (btn) {{
-                                btn.scrollIntoView({{block: 'center'}});
-                                btn.click();
-                                return true;
-                            }}
-                            return false;
-                        """)
-                        
-                        if result:
-                            logger.debug(f"使用选择器 '{selector}' 点击回复按钮")
-                            clicked = True
-                            break
-                    except Exception:
-                        continue
+                # 策略1：直接查找
+                clicked = self._try_click_reply(page, selectors)
+                
+                # 策略2：如果未找到，强制滚动到底部加载 topic-footer
+                if not clicked:
+                    logger.info("未找到回复按钮，尝试滚动到底部...")
+                    page.run_js("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(3)
+                    clicked = self._try_click_reply(page, selectors)
                 
                 if not clicked:
-                    logger.debug("未找到回复按钮")
+                    logger.debug("最终未找到回复按钮")
                     return False
                 
                 time.sleep(3)
@@ -486,6 +591,26 @@ class LinuxDoUpgrade:
             logger.debug(f"回复失败: {str(e)}")
             return False
 
+    def _try_click_reply(self, page, selectors):
+        """辅助函数：尝试点击各类回复按钮"""
+        for selector in selectors:
+            try:
+                result = page.run_js(f"""
+                    var btn = document.querySelector('{selector}');
+                    if (btn && btn.offsetParent !== null) {{ // ensure visible
+                        btn.scrollIntoView({{block: 'center'}});
+                        btn.click();
+                        return true;
+                    }}
+                    return false;
+                """)
+                if result:
+                    logger.debug(f"使用选择器 '{selector}' 点击回复按钮")
+                    return True
+            except Exception:
+                continue
+        return False
+
     def print_connect_info(self):
         """打印连接信息"""
         logger.info("获取连接信息")
@@ -532,7 +657,8 @@ class LinuxDoUpgrade:
                     "text": status_msg,
                     "parse_mode": "HTML"
                 }
-                response = requests.post(tg_url, json=tg_data, timeout=10, impersonate="chrome136")
+                proxies = {"http": LINUXDO_PROXY, "https": LINUXDO_PROXY} if LINUXDO_PROXY else None
+                response = requests.post(tg_url, json=tg_data, timeout=10, impersonate="chrome136", proxies=proxies)
                 response.raise_for_status()
                 logger.success("✅ Telegram 通知发送成功")
             except Exception as e:
@@ -541,12 +667,14 @@ class LinuxDoUpgrade:
         # Gotify 通知
         if GOTIFY_URL and GOTIFY_TOKEN:
             try:
+                proxies = {"http": LINUXDO_PROXY, "https": LINUXDO_PROXY} if LINUXDO_PROXY else None
                 response = requests.post(
                     f"{GOTIFY_URL}/message",
                     params={"token": GOTIFY_TOKEN},
                     json={"title": "Linux.Do 升级任务", "message": status_msg, "priority": 5},
                     timeout=10,
-                    impersonate="chrome136"
+                    impersonate="chrome136",
+                    proxies=proxies
                 )
                 response.raise_for_status()
                 logger.success("✅ Gotify 通知发送成功")
@@ -564,11 +692,35 @@ class LinuxDoUpgrade:
                 params = {"title": "Linux.Do 升级任务", "desp": status_msg}
                 
                 try:
-                    response = requests.get(url, params=params, timeout=10, impersonate="chrome136")
+                    proxies = {"http": LINUXDO_PROXY, "https": LINUXDO_PROXY} if LINUXDO_PROXY else None
+                    response = requests.get(url, params=params, timeout=10, impersonate="chrome136", proxies=proxies)
                     response.raise_for_status()
                     logger.success("✅ Server 酱³ 通知发送成功")
                 except Exception as e:
                     logger.warning(f"⚠️ Server 酱³ 通知发送失败: {e}")
+
+        # 自定义 WeChat API 通知
+        if WECHAT_API_URL and WECHAT_AUTH_TOKEN:
+            try:
+                # 优先尝试 GET 请求
+                params = {
+                    "token": WECHAT_AUTH_TOKEN,
+                    "title": "Linux.Do 升级任务",
+                    "content": status_msg
+                }
+                response = requests.get(WECHAT_API_URL, params=params, timeout=10, impersonate="chrome136")
+                
+                # GET 失败 (405) 尝试 POST
+                if response.status_code == 405:
+                    logger.debug("自定义微信 GET 返回 405, 尝试 POST")
+                    response = requests.post(WECHAT_API_URL, json=params, timeout=10, impersonate="chrome136")
+                
+                if response.status_code >= 400:
+                     logger.warning(f"⚠️ 自定义微信通知 HTTP {response.status_code}: {response.text[:100]}")
+                else:
+                     logger.success("✅ 自定义微信通知发送成功")
+            except Exception as e:
+                logger.warning(f"⚠️ 自定义微信通知发送失败: {e}")
 
     def run(self):
         """主运行函数"""
