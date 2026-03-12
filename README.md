@@ -43,126 +43,266 @@
 | `SC3_PUSH_KEY`    | Server酱³ SendKey     | `sctpxxxxt`                             |
 | `BROWSE_ENABLED`  | 是否启用浏览帖子功能        | `true` 或 `false`，默认为 `true`           |
 
+# Linux.Do 快速升级脚本使用指南
+
+> **版本**：v1.1  
+> **更新时间**：2026-01-24  
+> **状态**：✅ 已修复 ElementNotFoundError 问题
+
+## 📋 功能说明
+
+这是一个 Linux.Do 论坛快速升级脚本，帮助您快速满足信任等级升级条件。
+
+> [!IMPORTANT]
+> 如遇到问题，请查看 [故障排查指南](./TROUBLESHOOTING.md)
+
+### 核心功能
+
+- ✅ **自动登录**：使用用户名密码登录
+- 📖 **智能浏览**：模拟真实用户滚动浏览
+- 👍 **自动点赞**：40% 概率点赞
+- 💬 **自动回复**：20% 概率回复（可配置）
+- 📊 **统计数据**：实时显示任务完成情况
+- 📱 **多渠道通知**：支持 Gotify 和 Server 酱³
+
+## 🎯 升级条件
+
+### TL0 → TL1（基本用户）
+- 进入至少 **5个话题** ✅
+- 阅读至少 **30篇帖子** ✅
+- 总共花费 **10分钟**阅读 ✅
+
+**预计时间**：1-2 次运行即可达成
+
+### TL1 → TL2（成员）
+- 至少访问 **15天** ⏰
+- 至少点赞 **1次** ✅
+- 至少收到 **1次点赞** ⚠️
+- 回复至少 **3个不同的话题** ✅
+- 进入至少 **20个话题** ✅
+- 阅读至少 **100篇帖子** ✅
+- 总共花费 **60分钟**阅读 ✅
+
+**预计时间**：15 天（受访问天数限制）
+
+### TL2 → TL3（活跃用户）
+- 过去100天访问 **50天** ⏰
+- 回复 **10个不同的话题** ✅
+- 浏览 **25%的新话题** ✅
+- 阅读 **25%的新帖子** ✅
+- 收到 **20个点赞** ⚠️
+- 送出 **30个点赞** ✅
+
+**预计时间**：100 天（需长期运行）
+
+> [!IMPORTANT]
+> **收到点赞** 需要发布优质内容，建议配合真实参与讨论
+
+## 🚀 快速开始
+
+### 1. 安装依赖
+
+```bash
+pip3 install loguru DrissionPage tabulate curl-cffi beautifulsoup4
+```
+
+### 2. 配置环境变量
+
+在青龙面板环境变量中添加：
+
+| 变量名 | 说明 | 必填 |
+|--------|------|------|
+| `LINUXDO_USERNAME` | Linux.Do 用户名 | ✅ |
+| `LINUXDO_PASSWORD` | Linux.Do 密码 | ✅ |
+| `BROWSE_ENABLED` | 是否启用浏览（默认 true） | ❌ |
+| `GOTIFY_URL` | Gotify 服务器地址 | ❌ |
+| `GOTIFY_TOKEN` | Gotify Token | ❌ |
+| `SC3_PUSH_KEY` | Server 酱³ SendKey | ❌ |
+| `LINUXDO_PROXY` | 代理设置 | ❌ |http://192.168.2.8:7890
+### 3. 添加定时任务
+
+在青龙面板添加：
+
+- **名称**：Linux.Do 快速升级
+- **命令**：`python3 /ql/scripts/linuxdo_upgrade.py`
+- **定时规则**：`0 */6 * * *`（每 6 小时一次）
+### 定时规则
+
+```bash
+# 任务 1：早上 9 点
+0 9 * * *
+
+# 任务 2：下午 3 点  
+0 15 * * *
+
+# 任务 3：晚上 9 点
+0 21 * * *
+```
+## ⚙️ 配置调整
+
+### 每次任务量配置
+
+编辑脚本中的 `UPGRADE_CONFIG`：
+
+```python
+UPGRADE_CONFIG = {
+    "topics_to_browse": 15,        # 每次浏览话题数
+    "likes_to_give": 5,            # 每次点赞数
+    "replies_to_post": 2,          # 每次回复数
+}
+```
+
+### 回复内容自定义
+
+修改 `REPLY_TEMPLATES` 列表：
+
+```python
+REPLY_TEMPLATES = [
+    "感谢分享！",
+    "学习了，很有帮助",
+    # 添加更多个性化回复...
+]
+```
+
+## 📊 运行效果
+
+```
+==== Linux.Do 快速升级脚本开始 ====
+开始登录
+获取 CSRF token...
+CSRF Token obtained: xxxxxxxxxx...
+正在登录...
+登录成功!
+获取连接信息
+--------------Connect Info-----------------
++--------+--------+--------+
+|  项目  |  当前  |  要求  |
++--------+--------+--------+
+| 阅读   |  150   |  100   |
+| 点赞   |   25   |   30   |
+| ...    |  ...   |  ...   |
++--------+--------+--------+
+
+同步 Cookie 到 DrissionPage...
+登录验证成功
+
+==================================================
+🚀 开始执行升级任务
+==================================================
+发现 30 个主题帖，随机选择 15 个
+[1/15] 处理主题...
+滚动 1/5: 523px
+滚动 2/5: 478px
+👍 点赞成功 (1)
+[2/15] 处理主题...
+💬 回复成功: 感谢分享！ (1)
+...
+
+==================================================
+📊 今日任务完成统计:
+  - 浏览话题: 15
+  - 阅读帖子: 45
+  - 给出点赞: 5
+  - 发布回复: 2
+==================================================
+
+✅ Gotify 通知发送成功
+✅ Server 酱³ 通知发送成功
+==== Linux.Do 快速升级脚本结束 ====
+```
+
+## 📈 升级策略
+
+### 快速升级到 TL1（1天）
+
+```bash
+# 定时规则：每 6 小时一次
+0 */6 * * *
+```
+
+配置：
+```python
+UPGRADE_CONFIG = {
+    "topics_to_browse": 10,
+    "likes_to_give": 3,
+    "replies_to_post": 1,
+}
+```
+
+### 稳定升级到 TL2（15天）
+
+```bash
+# 定时规则：每天 2 次
+0 9,21 * * *
+```
+
+配置：
+```python
+UPGRADE_CONFIG = {
+    "topics_to_browse": 15,
+    "likes_to_give": 5,
+    "replies_to_post": 2,
+}
+```
+
+## 🔧 故障排查
+
+### DrissionPage 安装问题
+
+如果遇到 DrissionPage 安装失败：
+
+```bash
+pip3 install DrissionPage --upgrade
+```
+
+### Chromium 路径问题
+
+脚本会自动查找 Chromium，如果失败，请确保已安装：
+
+```bash
+apt-get install -y chromium chromium-driver
+```
+
+## 📝 注意事项
+
+### 安全建议
+
+- ✅ 控制每日任务量
+- ✅ 配合真实使用
+- ✅ 不要过度自动化
+- ❌ 避免 24 小时不间断运行
+
+### 升级限制
+
+- **访问天数**：硬性要求，无法加速
+- **收到点赞**：需要发布优质内容
+- **TL3 降级**：100天内不满足条件会降级
+
+## 🆚 与 NodeLoc 脚本对比
+
+| 特性 | Linux.Do | NodeLoc |
+|------|----------|---------|
+| 浏览器 | DrissionPage | Selenium |
+| 登录方式 | 用户名+密码 | 用户名+密码 |
+| 智能滚动 | ✅ | ✅ |
+| 点赞功能 | ✅ 40% 概率 | ✅ 每主题 1-2 次 |
+| 回复功能 | ✅ 20% 概率 | ✅ 30% 概率 |
+| 重试机制 | ✅ | ✅ |
+| 通知渠道 | Gotify + Server 酱³ | TG + Gotify + Server 酱³ |
+
+## ❓ 常见问题
+
+**Q: 多久能升级到 TL2？**  
+A: 最快 15 天（受访问天数限制）
+
+**Q: 可以同时运行多个账号吗？**  
+A: 可以，为每个账号配置独立的环境变量和定时任务
+
+**Q: 脚本会被封号吗？**  
+A: 已加入随机延迟和行为模拟，但仍需控制任务量
+
 ---
 
-## 如何使用
-
-### GitHub Actions 自动运行
-
-此项目的 GitHub Actions 配置会自动每天运行2次签到脚本。你无需进行任何操作即可启动此自动化任务。GitHub Actions 的工作流文件位于 `.github/workflows` 目录下，文件名为 `daily-check-in.yml`。
-
-#### 配置步骤
-
-1. **设置环境变量**：
-    - 在 GitHub 仓库的 `Settings` -> `Secrets and variables` -> `Actions` 中添加以下变量：
-        - `LINUXDO_USERNAME`：你的 LinuxDo 用户名或邮箱。
-        - `LINUXDO_PASSWORD`：你的 LinuxDo 密码。
-        - (可选) `BROWSE_ENABLED`：是否启用浏览帖子，`true` 或 `false`，默认为 `true`。
-        - (可选) `GOTIFY_URL` 和 `GOTIFY_TOKEN`。
-        - (可选) `SC3_PUSH_KEY`。
-        - (可选) `TELEGRAM_TOKEN` 和 `TELEGRAM_USERID`。
-
-2. **手动触发工作流**：
-    - 进入 GitHub 仓库的 `Actions` 选项卡。
-    - 选择你想运行的工作流。
-    - 点击 `Run workflow` 按钮，选择分支，然后点击 `Run workflow` 以启动工作流。
-
-#### 运行结果
-
-##### 网页中查看
-
-`Actions`栏 -> 点击最新的`Daily Check-in` workflow run -> `run_script` -> `Execute script`
-
-可看到`Connect Info`：
-（新号可能这里为空，多挂几天就有了）
-![image](https://github.com/user-attachments/assets/853549a5-b11d-4d5a-9284-7ad2f8ea698b)
-
-### 青龙面板使用
-
-*注意：如果是docker容器创建的青龙，**请使用`whyour/qinglong:debian`镜像**，latest（alpine）版本可能无法安装部分依赖*
-
-1. **依赖安装**
-    - 安装Python依赖
-      - 进入青龙面板 -> 依赖管理 -> 安装依赖
-        - 依赖类型选择`python3`
-        - 自动拆分选择`是`
-        - 名称填写(仓库`requirements.txt`文件的完整内容)：
-            ```
-            DrissionPage==4.1.0.18
-            wcwidth==0.2.13
-            tabulate==0.9.0
-            loguru==0.7.2
-            curl-cffi
-            bs4
-            ```
-        - 点击确定
-    - 安装 linux chromium 依赖
-      - 青龙面板 -> 依赖管理 -> 安装Linux依赖
-      - 名称填`chromium`
-  
-        > 若安装失败，可能需要执行`apt update`更新索引（若使用docker则需进入docker容器执行）
-
-
-2. **添加仓库**
-    - 进入青龙面板 -> 订阅管理 -> 创建订阅
-    - 依次在对应的字段填入内容（未提及的不填）：
-      - **名称**：Linux.DO 签到
-      - **类型**：公开仓库
-      - **链接**：https://github.com/doveppp/linuxdo-checkin.git
-      - **分支**：main
-      - **定时类型**：`crontab`
-      - **定时规则**(拉取上游代码的时间，一天一次，可以自由调整频率): 0 0 * * *
-
-3. **配置环境变量**
-    - 进入青龙面板 -> 环境变量 -> 创建变量
-    - 需要配置以下变量：
-        - `LINUXDO_USERNAME`：你的LinuxDo用户名/邮箱
-        - `LINUXDO_PASSWORD`：你的LinuxDo密码
-        - (可选) `BROWSE_ENABLED`：是否启用浏览帖子功能，`true` 或 `false`，默认为 `true`
-        - (可选) `GOTIFY_URL`：Gotify服务器地址
-        - (可选) `GOTIFY_TOKEN`：Gotify应用Token
-        - (可选) `SC3_PUSH_KEY`：Server酱³ SendKey        
-        - (可选) `TELEGRAM_TOKEN`：Telegram Bot Token
-        - (可选) `TELEGRAM_USERID`：Telegram用户ID
-
-4. **手动拉取脚本**
-    - 首次添加仓库后不会立即拉取脚本，需要等待到定时任务触发，当然可以手动触发拉取
-    - 点击右侧"运行"按钮可手动执行
-
-#### 运行结果
-
-##### 青龙面板中查看
-- 进入青龙面板 -> 定时任务 -> 找到`Linux.DO 签到` -> 点击右侧的`日志`
-
-### Gotify 通知
-
-当配置了 `GOTIFY_URL` 和 `GOTIFY_TOKEN` 时，签到结果会通过 Gotify 推送通知。
-具体 Gotify 配置方法请参考 [Gotify 官方文档](https://gotify.net/docs/).
-
-### Server酱³ 通知
-
-当配置了 `SC3_PUSH_KEY` 时，签到结果会通过 Server酱³ 推送通知。
-获取 SendKey：请访问 [Server酱³ SendKey获取](https://sc3.ft07.com/sendkey) 获取你的推送密钥。
-
-### Telegram 通知
-
-可选功能：配置 Telegram 通知，实时获取签到结果。
-
-需要在 GitHub Secrets 中配置：
-- `TELEGRAM_TOKEN`：Telegram Bot Token
-- `TELEGRAM_USERID`：Telegram 用户 ID
-
-获取方法：
-1. Bot Token：与 [@BotFather](https://t.me/BotFather) 对话创建机器人获取
-2. 用户 ID：与 [@userinfobot](https://t.me/userinfobot) 对话获取
-
-未配置时将自动跳过通知功能，不影响签到。
-
-
-## 自动更新
-
-- **Github Actions**：默认状态下自动更新是关闭的，[点击此处](https://github.com/ChatGPTNextWeb/ChatGPT-Next-Web/blob/main/README_CN.md#%E6%89%93%E5%BC%80%E8%87%AA%E5%8A%A8%E6%9B%B4%E6%96%B0)
-查看打开自动更新步骤。
-- **青龙面板**：更新是以仓库设置的定时规则有关，按照本文配置，则是每天0点更新一次。
-
-
+**作者**：djkyc 
+**版本**：1.0  
+**更新时间**：2026-01-24
