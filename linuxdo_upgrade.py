@@ -558,16 +558,16 @@ class LinuxDoUpgrade:
                     else:
                         # Fallback: 使用 DrissionPage 原生查找
                         try:
-                            # 查找所有类名包含 reaction-button 的按钮
-                            like_btns = page.eles("css:.discourse-reactions-reaction-button")
+                            # 查找所有类名包含 reaction-button 的按钮，加入短超时避免死等
+                            like_btns = page.eles("css:.discourse-reactions-reaction-button", timeout=1)
                             if not like_btns:
-                                like_btns = page.eles("css:button[title*='点赞']")
+                                like_btns = page.eles("css:button[title*='点赞']", timeout=1)
                             if not like_btns:
-                                like_btns = page.eles("css:.btn-toggle-reaction-like")
+                                like_btns = page.eles("css:.btn-toggle-reaction-like", timeout=1)
                             if not like_btns:
-                                like_btns = page.eles("xpath://button[contains(@class, 'reaction-button') or contains(@class, 'like')]")
+                                like_btns = page.eles("xpath://button[contains(@class, 'reaction-button') or contains(@class, 'like')]", timeout=1)
                             if not like_btns:
-                                like_btns = page.eles("xpath://button[.//svg[contains(@class, 'd-icon-heart')]]")
+                                like_btns = page.eles("xpath://button[.//svg[contains(@class, 'd-icon-heart')]]", timeout=1)
                                 
                             found_and_clicked = False
                             for btn in like_btns:
@@ -709,7 +709,7 @@ class LinuxDoUpgrade:
                 pass
                 
             try:
-                btn = page.ele(f"css:{selector}")
+                btn = page.ele(f"css:{selector}", timeout=1)
                 if btn and btn.states.is_displayed:
                     page.run_js("arguments[0].scrollIntoView({block: 'center'});", btn)
                     time.sleep(0.5)
