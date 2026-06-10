@@ -173,10 +173,23 @@ class LinuxDoUpgrade:
     def save_cookies(self):
         """保存 Cookie 到本地"""
         try:
-            # 优先保存浏览器中的 Cookie，因为可能包含更多动态生成的
-            cookies = self.page.cookies.as_list()
+            # DrissionPage 较新版本中 self.page.cookies 不是对象就是方法
+            if callable(self.page.cookies):
+                cookies_list = self.page.cookies(as_dict=False)
+            else:
+                try:
+                    cookies_list = self.page.cookies.as_list()
+                except:
+                    # 对于一些特殊版本，直接取
+                    cookies_list = getattr(self.page, 'cookies_to_dict', lambda: [])()
+                    
+            if not isinstance(cookies_list, list):
+                # 尝试其他方式获取
+                cookies_dict = self.page.cookies if isinstance(self.page.cookies, dict) else (self.page.cookies() if callable(self.page.cookies) else {})
+                cookies_list = [{'name': k, 'value': v, 'domain': '.linux.do'} for k, v in cookies_dict.items()]
+
             # 过滤只保存 linux.do 相关
-            filtered_cookies = [c for c in cookies if 'linux.do' in c.get('domain', '')]
+            filtered_cookies = [c for c in cookies_list if isinstance(c, dict) and 'linux.do' in c.get('domain', '')]
             
             if filtered_cookies:
                 with open(COOKIE_FILE, 'w', encoding='utf-8') as f:
@@ -277,9 +290,20 @@ class LinuxDoUpgrade:
     def sync_cookies_to_session(self):
         """同步浏览器 Cookie 到 requests session"""
         try:
-            cookies = self.page.cookies.as_dict()
-            self.session.cookies.update(cookies)
-            logger.info(f"已同步 {len(cookies)} 个 Cookie 到 Session")
+            cookies = {}
+            if callable(self.page.cookies):
+                cookies = self.page.cookies()
+            else:
+                try:
+                    cookies = self.page.cookies.as_dict()
+                except:
+                    pass
+            
+            if cookies and isinstance(cookies, dict):
+                self.session.cookies.update(cookies)
+                logger.info(f"已同步 {len(cookies)} 个 Cookie 到 Session")
+            else:
+                logger.warning("未获取到有效的 Cookie 字典形式")
         except Exception as e:
             logger.warning(f"同步 Cookie 失败: {e}")
             
