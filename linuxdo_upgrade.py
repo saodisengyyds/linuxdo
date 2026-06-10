@@ -643,7 +643,7 @@ class LinuxDoUpgrade:
         except Exception as e:
             logger.warning(f"获取连接信息失败: {e}")
 
-        def send_notifications(self):
+    def send_notifications(self):
         status_msg = (
             f"Linux.Do 升级任务完成 ✅\n"
             f"浏览话题: {self.stats['topics_browsed']}\n"
@@ -658,7 +658,7 @@ class LinuxDoUpgrade:
                 sys.path.append('/ql/scripts')
             if '/ql/data/scripts' not in sys.path:
                 sys.path.append('/ql/data/scripts')
-            
+
             from notify import send
             send("Linux.Do 升级任务", status_msg)
             logger.success("✅ 已通过青龙自带 notify.py 发送通知")
