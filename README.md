@@ -136,9 +136,6 @@ beautifulsoup4
 | `LINUXDO_USERNAME` | Linux.Do 用户名 | ✅ |
 | `LINUXDO_PASSWORD` | Linux.Do 密码 | ✅ |
 | `BROWSE_ENABLED` | 是否启用浏览（默认 true） | ❌ |
-| `GOTIFY_URL` | Gotify 服务器地址 | ❌ |
-| `GOTIFY_TOKEN` | Gotify Token | ❌ |
-| `SC3_PUSH_KEY` | Server 酱³ SendKey | ❌ |
 | `LINUXDO_PROXY` | 代理设置 | ❌ |http://192.168.2.8:7890
 ### 3. 创建执行任务
 

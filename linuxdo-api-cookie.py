@@ -408,63 +408,22 @@ class LinuxDoUpgrade:
 
         return True
 
-    def send_notifications(self):
-        status_msg = (
-            f"Linux.Do 升级任务完成 ✅\n"
-            f"用户: {self.current_user}\n"
-            f"浏览主题: {self.stats['topics_browsed']}\n"
-            f"阅读帖子: {self.stats['posts_read']}\n"
-            f"给出点赞: {self.stats['likes_given']}\n"
-            f"发布回复: {self.stats['replies_posted']}"
-        )
-
-        if TG_BOT_TOKEN and TG_CHAT_ID:
-            try:
-                r = requests.post(
-                    f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage",
-                    json={"chat_id": TG_CHAT_ID, "text": status_msg, "disable_web_page_preview": True},
-                    timeout=15, impersonate="chrome136", proxies=self.proxies
-                )
-                logger.success("✅ TG 通知发送成功") if r.status_code == 200 else logger.warning(f"⚠️ TG HTTP={r.status_code}")
-            except Exception as e:
-                logger.warning(f"⚠️ TG 推送异常: {e}")
-
-        if GOTIFY_URL and GOTIFY_TOKEN:
-            try:
-                r = requests.post(
-                    f"{GOTIFY_URL}/message", params={"token": GOTIFY_TOKEN},
-                    json={"title": "Linux.Do 升级", "message": status_msg, "priority": 5},
-                    timeout=10, impersonate="chrome136", proxies=self.proxies
-                )
-                r.raise_for_status()
-                logger.success("✅ Gotify 通知发送成功")
-            except Exception as e:
-                logger.warning(f"⚠️ Gotify 失败: {e}")
-
-        if SC3_PUSH_KEY:
-            match = re.match(r"sct(\d+)t", SC3_PUSH_KEY, re.I)
-            if match:
-                uid = match.group(1)
-                try:
-                    r = requests.get(
-                        f"https://{uid}.push.ft07.com/send/{SC3_PUSH_KEY}",
-                        params={"title": "Linux.Do 升级", "desp": status_msg},
-                        timeout=10, impersonate="chrome136", proxies=self.proxies
-                    )
-                    r.raise_for_status()
-                    logger.success("✅ Server酱³ 通知发送成功")
-                except Exception as e:
-                    logger.warning(f"⚠️ Server酱³ 失败: {e}")
-
-        if WECHAT_API_URL and WECHAT_AUTH_TOKEN:
-            try:
-                params = {"token": WECHAT_AUTH_TOKEN, "title": "Linux.Do 升级", "content": status_msg}
-                r = requests.get(WECHAT_API_URL, params=params, timeout=10, impersonate="chrome136")
-                if r.status_code == 405:
-                    r = requests.post(WECHAT_API_URL, json=params, timeout=10, impersonate="chrome136")
-                logger.success("✅ 微信通知发送成功") if r.status_code < 400 else logger.warning(f"⚠️ 微信 HTTP {r.status_code}")
-            except Exception as e:
-                logger.warning(f"⚠️ 微信通知失败: {e}")
+    def send_notifications(all_stats: str):
+    # 尝试使用青龙自带通知
+    try:
+        import sys
+        if '/ql/scripts' not in sys.path:
+            sys.path.append('/ql/scripts')
+        if '/ql/data/scripts' not in sys.path:
+            sys.path.append('/ql/data/scripts')
+        
+        from notify import send
+        send("Linux.Do 升级任务", all_stats)
+        logger.success("✅ 已通过青龙自带 notify.py 发送通知")
+    except ImportError:
+        logger.info("未找到青龙 notify.py，由于未配置自定义通知，跳过推送。")
+    except Exception as e:
+        logger.warning(f"⚠️ 青龙通知调用失败: {e}")
 
     def run(self) -> int:
         try:

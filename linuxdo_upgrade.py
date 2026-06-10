@@ -643,8 +643,7 @@ class LinuxDoUpgrade:
         except Exception as e:
             logger.warning(f"获取连接信息失败: {e}")
 
-    def send_notifications(self):
-        """发送多渠道通知"""
+        def send_notifications(self):
         status_msg = (
             f"Linux.Do 升级任务完成 ✅\n"
             f"浏览话题: {self.stats['topics_browsed']}\n"
@@ -652,80 +651,21 @@ class LinuxDoUpgrade:
             f"给出点赞: {self.stats['likes_given']}\n"
             f"发布回复: {self.stats['replies_posted']}"
         )
-        
-        # Telegram 通知
-        if TG_BOT_TOKEN and TG_CHAT_ID:
-            try:
-                tg_url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-                tg_data = {
-                    "chat_id": TG_CHAT_ID,
-                    "text": status_msg,
-                    "parse_mode": "HTML"
-                }
-                proxies = {"http": LINUXDO_PROXY, "https": LINUXDO_PROXY} if LINUXDO_PROXY else None
-                response = requests.post(tg_url, json=tg_data, timeout=10, impersonate="chrome136", proxies=proxies)
-                response.raise_for_status()
-                logger.success("✅ Telegram 通知发送成功")
-            except Exception as e:
-                logger.warning(f"⚠️ Telegram 通知发送失败: {e}")
-        
-        # Gotify 通知
-        if GOTIFY_URL and GOTIFY_TOKEN:
-            try:
-                proxies = {"http": LINUXDO_PROXY, "https": LINUXDO_PROXY} if LINUXDO_PROXY else None
-                response = requests.post(
-                    f"{GOTIFY_URL}/message",
-                    params={"token": GOTIFY_TOKEN},
-                    json={"title": "Linux.Do 升级任务", "message": status_msg, "priority": 5},
-                    timeout=10,
-                    impersonate="chrome136",
-                    proxies=proxies
-                )
-                response.raise_for_status()
-                logger.success("✅ Gotify 通知发送成功")
-            except Exception as e:
-                logger.warning(f"⚠️ Gotify 通知发送失败: {e}")
-        
-        # Server 酱³ 通知
-        if SC3_PUSH_KEY:
-            match = re.match(r"sct(\d+)t", SC3_PUSH_KEY, re.I)
-            if not match:
-                logger.warning("⚠️ SC3_PUSH_KEY 格式错误")
-            else:
-                uid = match.group(1)
-                url = f"https://{uid}.push.ft07.com/send/{SC3_PUSH_KEY}"
-                params = {"title": "Linux.Do 升级任务", "desp": status_msg}
-                
-                try:
-                    proxies = {"http": LINUXDO_PROXY, "https": LINUXDO_PROXY} if LINUXDO_PROXY else None
-                    response = requests.get(url, params=params, timeout=10, impersonate="chrome136", proxies=proxies)
-                    response.raise_for_status()
-                    logger.success("✅ Server 酱³ 通知发送成功")
-                except Exception as e:
-                    logger.warning(f"⚠️ Server 酱³ 通知发送失败: {e}")
-
-        # 自定义 WeChat API 通知
-        if WECHAT_API_URL and WECHAT_AUTH_TOKEN:
-            try:
-                # 优先尝试 GET 请求
-                params = {
-                    "token": WECHAT_AUTH_TOKEN,
-                    "title": "Linux.Do 升级任务",
-                    "content": status_msg
-                }
-                response = requests.get(WECHAT_API_URL, params=params, timeout=10, impersonate="chrome136")
-                
-                # GET 失败 (405) 尝试 POST
-                if response.status_code == 405:
-                    logger.debug("自定义微信 GET 返回 405, 尝试 POST")
-                    response = requests.post(WECHAT_API_URL, json=params, timeout=10, impersonate="chrome136")
-                
-                if response.status_code >= 400:
-                     logger.warning(f"⚠️ 自定义微信通知 HTTP {response.status_code}: {response.text[:100]}")
-                else:
-                     logger.success("✅ 自定义微信通知发送成功")
-            except Exception as e:
-                logger.warning(f"⚠️ 自定义微信通知发送失败: {e}")
+        # 尝试使用青龙自带通知
+        try:
+            import sys
+            if '/ql/scripts' not in sys.path:
+                sys.path.append('/ql/scripts')
+            if '/ql/data/scripts' not in sys.path:
+                sys.path.append('/ql/data/scripts')
+            
+            from notify import send
+            send("Linux.Do 升级任务", status_msg)
+            logger.success("✅ 已通过青龙自带 notify.py 发送通知")
+        except ImportError:
+            logger.info("未找到青龙 notify.py，跳过推送。")
+        except Exception as e:
+            logger.warning(f"⚠️ 青龙通知调用失败: {e}")
 
     def run(self):
         """主运行函数"""
