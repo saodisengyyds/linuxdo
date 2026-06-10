@@ -533,7 +533,11 @@ class LinuxDoUpgrade:
                     "button.reply",
                     ".topic-footer-main-buttons button.reply",
                     ".topic-footer-main-buttons .btn.create",
-                    "#topic-footer-buttons .reply"
+                    "#topic-footer-buttons .reply",
+                    "button[title='回复此话题']",
+                    "button[aria-label='回复此话题']",
+                    "button.create[title*='回复']",
+                    ".reply-to-post"
                 ]
                 
                 # 策略1：直接查找
@@ -598,6 +602,7 @@ class LinuxDoUpgrade:
 
     def _try_click_reply(self, page, selectors):
         """辅助函数：尝试点击各类回复按钮"""
+        # Fallback to direct DrissionPage element finding as well
         for selector in selectors:
             try:
                 result = page.run_js(f"""
@@ -610,10 +615,22 @@ class LinuxDoUpgrade:
                     return false;
                 """)
                 if result:
-                    logger.debug(f"使用选择器 '{selector}' 点击回复按钮")
+                    logger.debug(f"使用选择器 JS '{selector}' 点击回复按钮")
                     return True
             except Exception:
+                pass
+                
+            try:
+                btn = page.ele(f"css:{selector}")
+                if btn and btn.states.is_displayed:
+                    page.run_js("arguments[0].scrollIntoView({block: 'center'});", btn)
+                    time.sleep(0.5)
+                    btn.click()
+                    logger.debug(f"使用 DrissionPage '{selector}' 点击回复按钮")
+                    return True
+            except:
                 continue
+                
         return False
 
     def print_connect_info(self):
