@@ -100,11 +100,32 @@
 
 ## 🚀 快速开始
 
+### 📦 青龙面板拉取（订阅）仓库
+
+在使用脚本前，请先将本仓库拉取到你的青龙面板中。
+
+进入青龙面板 -> **订阅管理** -> **创建订阅**，填写以下信息：
+
+- **名称**：LinuxDo签到升级
+- **类型**：公开仓库
+- **链接**：`https://github.com/saodisengyyds/linuxdo.git`
+- **分支**：`main`
+- **定时类型**：`crontab`
+- **定时规则**：`0 12 * * *` （这只是拉取最新代码的时间，随意设置）
+
+保存后点击**运行**按钮，等待拉取成功，即可在“定时任务”列表中看到拉取下来的脚本。
+
 ### 1. 安装依赖
 
-```bash
-pip3 install loguru DrissionPage tabulate curl-cffi beautifulsoup4
+在青龙面板 -> **依赖管理** -> **安装依赖（Python3）**：
+```text
+loguru
+DrissionPage
+tabulate
+curl-cffi
+beautifulsoup4
 ```
+*(注意：`linuxdo_upgrade.py` 需要用到 `DrissionPage` 和系统 `chromium` 浏览器。如果你想要纯 API 运行，请运行 `linuxdo-api-cookie.py`，它只需要 `loguru`、`curl-cffi` 和 `beautifulsoup4`)*
 
 ### 2. 配置环境变量
 
@@ -119,12 +140,14 @@ pip3 install loguru DrissionPage tabulate curl-cffi beautifulsoup4
 | `GOTIFY_TOKEN` | Gotify Token | ❌ |
 | `SC3_PUSH_KEY` | Server 酱³ SendKey | ❌ |
 | `LINUXDO_PROXY` | 代理设置 | ❌ |http://192.168.2.8:7890
-### 3. 添加定时任务
+### 3. 创建执行任务
 
-在青龙面板添加：
+由于青龙订阅可能会自动创建任务，你可以直接修改自动创建的任务，或者手动添加：
+
+在青龙面板 -> **定时任务** -> **创建任务**：
 
 - **名称**：Linux.Do 快速升级
-- **命令**：`python3 /ql/scripts/linuxdo_upgrade.py`
+- **命令**：`task saodisengyyds_linuxdo/linuxdo_upgrade.py` *(注意前缀可能根据你订阅时设置的文件名有所不同)*
 - **定时规则**：`0 */6 * * *`（每 6 小时一次）
 ### 定时规则
 
