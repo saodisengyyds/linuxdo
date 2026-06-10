@@ -471,9 +471,12 @@ class LinuxDoUpgrade:
                         const selectors = [
                             '.discourse-reactions-reaction-button', 
                             '.btn-toggle-reaction-like', 
+                            'button[title="点赞此帖子"]',
                             'button[title="点赞"]',
+                            'button[aria-label="点赞此帖子"]',
                             '.widget-button.btn-flat.like',
-                            '.actions .like'
+                            '.actions .like',
+                            '#post_1 .discourse-reactions-reaction-button'
                         ];
                         
                         // 寻找所有可见的按钮
@@ -484,11 +487,15 @@ class LinuxDoUpgrade:
                                 // 检查是否已点赞
                                 if (!btn.classList.contains('has-reaction') && 
                                     !btn.classList.contains('reacted') && 
+                                    !btn.classList.contains('has-used-main-reaction') &&
                                     !btn.title.includes('取消') &&
                                     btn.offsetParent !== null) { // 确保可见
                                     
                                     btn.scrollIntoView({block: 'center'});
                                     btn.click();
+                                    
+                                    // 给刚点赞的按钮加上标记，防止同一次脚本重复点击
+                                    btn.classList.add('has-used-main-reaction');
                                     return true;
                                 }
                             }
@@ -499,14 +506,40 @@ class LinuxDoUpgrade:
                     if result:
                         liked_count += 1
                         self.stats['likes_given'] += 1
-                        logger.success(f"👍 点赞成功 ({self.stats['likes_given']})")
+                        logger.success(f"👍 点赞成功 (JS) ({self.stats['likes_given']})")
                         time.sleep(random.uniform(1.5, 2.5))
                         
                         if self.stats['likes_given'] >= UPGRADE_CONFIG['likes_to_give']:
                             break
                     else:
-                        logger.debug("未找到未点赞的按钮")
-                        break
+                        # Fallback: 使用 DrissionPage 原生查找
+                        try:
+                            # 查找所有类名包含 reaction-button 的按钮
+                            like_btns = page.eles("css:.discourse-reactions-reaction-button")
+                            if not like_btns:
+                                like_btns = page.eles("css:button[title*='点赞']")
+                                
+                            found_and_clicked = False
+                            for btn in like_btns:
+                                classes = btn.attr('class') or ''
+                                title = btn.attr('title') or ''
+                                if 'has-reaction' not in classes and 'reacted' not in classes and '取消' not in title:
+                                    page.run_js("arguments[0].scrollIntoView({block: 'center'});", btn)
+                                    time.sleep(0.5)
+                                    btn.click()
+                                    liked_count += 1
+                                    self.stats['likes_given'] += 1
+                                    logger.success(f"👍 点赞成功 (DP) ({self.stats['likes_given']})")
+                                    time.sleep(random.uniform(1.5, 2.5))
+                                    found_and_clicked = True
+                                    break
+                                    
+                            if not found_and_clicked:
+                                logger.debug("DP也未找到未点赞的按钮")
+                                break
+                        except Exception as inner_e:
+                            logger.debug(f"DP寻找点赞按钮失败: {inner_e}")
+                            break
                         
                 except Exception as e:
                     logger.debug(f"点赞尝试失败:{e}")
