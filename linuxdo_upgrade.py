@@ -649,7 +649,7 @@ class LinuxDoUpgrade:
             
             # 查找编辑器
             try:
-                editor = page.ele("css:.d-editor-input", timeout=10)
+                editor = page.ele("css:.d-editor-input", timeout=3)
                 if not editor:
                     logger.debug("未找到编辑器")
                     return False
