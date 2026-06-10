@@ -175,7 +175,14 @@ class LinuxDoUpgrade:
         try:
             # DrissionPage 较新版本中 self.page.cookies 不是对象就是方法
             if callable(self.page.cookies):
-                cookies_list = self.page.cookies(as_dict=False)
+                try:
+                    cookies_list = self.page.cookies(as_dict=False)
+                except TypeError:
+                    # Some versions don't take as_dict, they return dict by default or take all_domains
+                    try:
+                        cookies_list = self.page.cookies(all_domains=True)
+                    except:
+                        cookies_list = self.page.cookies()
             else:
                 try:
                     cookies_list = self.page.cookies.as_list()
