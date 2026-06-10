@@ -92,6 +92,14 @@ COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "linuxdo_
 class LinuxDoUpgrade:
     def __init__(self) -> None:
         from sys import platform
+        
+        # Kill leftover Chromium instances first to avoid WebSocket 404
+        try:
+            import os, time
+            os.system("pkill -9 -f chromium")
+            time.sleep(1)
+        except:
+            pass
 
         if platform == "linux" or platform == "linux2":
             platformIdentifier = "X11; Linux x86_64"
