@@ -408,22 +408,22 @@ class LinuxDoUpgrade:
 
         return True
 
-    def send_notifications(all_stats: str):
-    # 尝试使用青龙自带通知
-    try:
-        import sys
-        if '/ql/scripts' not in sys.path:
-            sys.path.append('/ql/scripts')
-        if '/ql/data/scripts' not in sys.path:
-            sys.path.append('/ql/data/scripts')
-        
-        from notify import send
-        send("Linux.Do 升级任务", all_stats)
-        logger.success("✅ 已通过青龙自带 notify.py 发送通知")
-    except ImportError:
-        logger.info("未找到青龙 notify.py，由于未配置自定义通知，跳过推送。")
-    except Exception as e:
-        logger.warning(f"⚠️ 青龙通知调用失败: {e}")
+    def send_notifications(self, all_stats: str):
+        # 尝试使用青龙自带通知
+        try:
+            import sys
+            if '/ql/scripts' not in sys.path:
+                sys.path.append('/ql/scripts')
+            if '/ql/data/scripts' not in sys.path:
+                sys.path.append('/ql/data/scripts')
+
+            from notify import send
+            send("Linux.Do 升级任务", all_stats)
+            logger.success("✅ 已通过青龙自带 notify.py 发送通知")
+        except ImportError:
+            logger.info("未找到青龙 notify.py，由于未配置自定义通知，跳过推送。")
+        except Exception as e:
+            logger.warning(f"⚠️ 青龙通知调用失败: {e}")
 
     def run(self) -> int:
         try:
@@ -447,9 +447,16 @@ class LinuxDoUpgrade:
             logger.info(f"  - 阅读帖子: {self.stats['posts_read']}")
             logger.info(f"  - 给出点赞: {self.stats['likes_given']}")
             logger.info(f"  - 发布回复: {self.stats['replies_posted']}")
+            all_stats = (
+                f"Linux.Do 升级任务完成 ✅\n"
+                f"浏览主题: {self.stats['topics_browsed']}\n"
+                f"阅读帖子: {self.stats['posts_read']}\n"
+                f"给出点赞: {self.stats['likes_given']}\n"
+                f"发布回复: {self.stats['replies_posted']}"
+            )
             logger.info(f"{'='*50}\n")
 
-            self.send_notifications()
+            self.send_notifications(all_stats)
             logger.info("==== Linux.Do 快速升级脚本结束 ====")
             return 0
 
