@@ -518,6 +518,10 @@ class LinuxDoUpgrade:
                             like_btns = page.eles("css:.discourse-reactions-reaction-button")
                             if not like_btns:
                                 like_btns = page.eles("css:button[title*='点赞']")
+                            if not like_btns:
+                                like_btns = page.eles("css:.btn-toggle-reaction-like")
+                            if not like_btns:
+                                like_btns = page.eles("xpath://button[contains(@class, 'reaction-button') or contains(@class, 'like')]")
                                 
                             found_and_clicked = False
                             for btn in like_btns:
@@ -570,7 +574,8 @@ class LinuxDoUpgrade:
                     "button[title='回复此话题']",
                     "button[aria-label='回复此话题']",
                     "button.create[title*='回复']",
-                    ".reply-to-post"
+                    ".reply-to-post",
+                    "button.btn-primary.create"
                 ]
                 
                 # 策略1：直接查找
