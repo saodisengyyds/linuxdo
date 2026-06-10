@@ -116,6 +116,8 @@ class LinuxDoUpgrade:
             .set_argument("--disable-gpu")
             .set_argument("--disable-dev-shm-usage")
             .set_argument("--disable-extensions")
+            .set_argument("--blink-settings=imagesEnabled=false")
+            .set_argument("--disable-software-rasterizer")
             .set_argument("--window-size=1920,1080")
         )
         if LINUXDO_PROXY:
