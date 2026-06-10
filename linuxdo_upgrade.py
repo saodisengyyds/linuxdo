@@ -476,7 +476,10 @@ class LinuxDoUpgrade:
                             'button[aria-label="点赞此帖子"]',
                             '.widget-button.btn-flat.like',
                             '.actions .like',
-                            '#post_1 .discourse-reactions-reaction-button'
+                            '#post_1 .discourse-reactions-reaction-button',
+                            'button.discourse-reactions-reaction-button',
+                            'button .d-icon-heart',
+                            'button.react-button'
                         ];
                         
                         // 寻找所有可见的按钮
@@ -522,6 +525,8 @@ class LinuxDoUpgrade:
                                 like_btns = page.eles("css:.btn-toggle-reaction-like")
                             if not like_btns:
                                 like_btns = page.eles("xpath://button[contains(@class, 'reaction-button') or contains(@class, 'like')]")
+                            if not like_btns:
+                                like_btns = page.eles("xpath://button[.//svg[contains(@class, 'd-icon-heart')]]")
                                 
                             found_and_clicked = False
                             for btn in like_btns:
@@ -575,7 +580,11 @@ class LinuxDoUpgrade:
                     "button[aria-label='回复此话题']",
                     "button.create[title*='回复']",
                     ".reply-to-post",
-                    "button.btn-primary.create"
+                    "button.btn-primary.create",
+                    "button[title='回复']",
+                    "button[aria-label='回复']",
+                    "button .d-icon-reply",
+                    "button.create"
                 ]
                 
                 # 策略1：直接查找
