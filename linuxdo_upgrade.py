@@ -734,10 +734,25 @@ class LinuxDoUpgrade:
             from notify import send
             send("Linux.Do 升级任务", status_msg)
             logger.success("✅ 已通过青龙自带 notify.py 发送通知")
-        except ImportError:
-            logger.info("未找到青龙 notify.py，跳过推送。")
         except Exception as e:
-            logger.warning(f"⚠️ 青龙通知调用失败: {e}")
+            logger.info(f"未找到青龙 notify.py 或发送失败 ({e})，尝试直接使用 TG 环境变量推送...")
+            import os
+            import requests
+            tg_token = os.environ.get("TG_BOT_TOKEN", "").strip()
+            tg_chat_id = os.environ.get("TG_CHAT_ID", "").strip()
+            if tg_token and tg_chat_id:
+                url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+                payload = {"chat_id": tg_chat_id, "text": status_msg, "disable_web_page_preview": True}
+                try:
+                    r = requests.post(url, json=payload, timeout=15)
+                    if r.status_code == 200:
+                        logger.success("✅ 已通过 Telegram 直接发送通知")
+                    else:
+                        logger.warning(f"⚠️ Telegram 发送失败: {r.text}")
+                except Exception as ex:
+                    logger.warning(f"⚠️ Telegram 请求异常: {ex}")
+            else:
+                logger.info("未配置 TG_BOT_TOKEN 环境变量，已完全跳过推送。")
 
     def run(self):
         """主运行函数"""
